@@ -1,0 +1,90 @@
+---
+title: "omopr: OMOP CDM database querying using tidyverse tools"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{omopr: OMOP CDM database querying using tidyverse tools}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+## Overview
+
+This small package contains a few utility functions for querying electronic health record (EHR) data in [OMOP Common Data Model](https://www.ohdsi.org/data-standardization/the-common-data-model/) databases using a `tidyverse` approach based on `dbplyr` lazy tibble references. This allows efficient in-database querying and data wrangling without explicit writing of SQL queries. This vignette assumes a basic familiarity with OMOP CDM databases and tidyverse tools such as `dplyr`. Anyone not familiar with `dbplyr` (note the `b`) should read the `dbplyr` vignette before proceeding further.
+```{r eval=FALSE}
+vignette("dbplyr")
+```
+The main substantive content of *this* package is a function, `concept_names`, which joins a given lazy tibble reference against the CDM `concept` table to add in human readable concept names. The package should work with any version of the OMOP CDM. Essentially the only thing the package assumes or requires is that there will be a `concept` table containing at least the columns `concept_id` and `concept_name`.
+
+## Connect to an OMOP CDM database
+
+It is assumed that users of this package will already have access to an RDBMS containing EHR data data according to the OMOP CDM. Connection details will be highly specific to the database, but this package is relatively unopinionated about the nature of the `DBI` connection. In particular, both `odbc` connections, and custom database connections, such as `RPostgres` are fine. A minimal example might look something like:
+```{r eval=FALSE}
+con <- DBI::dbConnect(RPostgres::Postgres(),
+       host = "localhost", dbname = "synpuf")
+```
+but this must be customised for your own specific database details.
+```{r echo=FALSE}
+con <- omopr:::dummy_con()
+```
+
+## Create a list of lazy tibbles
+
+The package is initialised by generating a list of available CDM tables with
+```{r message=FALSE}
+library(omopr)
+library(dplyr)
+
+tRefs = omopr_init(con)
+```
+This should return an error if CDM tables are not found at the given connection. Note that this will work provided that the CDM tables are in the default RDBMS schema (often called `public` or `dbo`), but if a non-default schema is used (here, for example, `cdm`), then this must be provided
+```{r eval=FALSE}
+tRefs = omopr_init(con, "cdm")
+```
+The returned value, here called `tRefs`, is a named list of the available CDM tables as lazy `dbplyr` tibbles. So, for example,
+```{r results="hide"}
+tRefs[["person"]]
+```
+is the `person` table as a lazy tibble. Tables can be joined using standard `dplyr` conventions, eg.
+```{r}
+vp = tRefs[["visit_occurrence"]] %>%
+  inner_join(tRefs[["person"]], by = "person_id")
+```
+and the result will again be a lazy tibble reference. The point of this is that all of the joining and wrangling happens in the database, and not in the R session. For big databases this can be a massive advantage.
+
+### Row counts
+
+Note that the package includes a small function, `row_counts` which will compute the number of populated rows in each CDM table:
+```{r results="hide"}
+row_counts(tRefs)
+```
+For a large database, this query will be very slow, and the tibble returned will not be lazy.
+
+## Add concept names to lazy tibbles
+
+The main function in the package is the function `concept_names`.
+```{r}
+vpc = vp %>% concept_names()
+```
+For each column in the input table of the form `XXX_concept_id`, this function adds a new column of the form `XXX_concept_name` (provided that it does not already exist), obtained by a left join against the CDM `concept` table. Again, the result is a lazy tibble, so the joining happens inside the RDBMS.
+
+If not all concept names require resolving, a list of the required joins can be provided.
+```{r results="hide"}
+vp %>% concept_names(c("visit_concept_id", "gender_concept_id"))
+```
+Since the resolving is carried out as a left join, any non-matching concept IDs appear as NA in the new column. In some cases this will be appropriate, but in others, it might be more useful to copy across a string representation of the concept ID in the non-matching cases. This can be obtained using the `fill` argument.
+```{r results="hide"}
+vp %>% concept_names(c("visit_concept_id", "gender_concept_id"), fill = TRUE)
+```
+Again, the result is a lazy tibble. The function is very much designed to be used with lazy tibbles, so that the joins happen in the RDBMS and not in in-memory in the R user session. So by default, the join will fail if applied to an in-memory tibble. In this case, it is possible to force an in-memory join by using the `copy` argument.
+```{r results="hide"}
+vp %>% collect() %>% concept_names(copy = TRUE)
+```
+but note that this join will be *very* slow for large databases.
+
+## Using SQL queries
+
+Really the whole point of this package is to facilitate the querying and wrangling of data using tidyverse tools in R code rather than by explicitly writing SQL queries, but it is worth noting in passing that it is possible to create lazy `dbplyr` tibbles directly from SQL statements.
+```{r results="hide"}
+tbl(con, sql("select * from person")) %>% concept_names()
+```
+

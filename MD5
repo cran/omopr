@@ -1,0 +1,14 @@
+23f6af203dabfe48c3e30c2409e57e06 *DESCRIPTION
+4f51344c2e0ac7183519a7556e9524a0 *NAMESPACE
+30690c0c3d597407bd0b08d4c9bd7f5d *R/concept_names.R
+c18aa2fdc5ff3539be63c71bbc8c1c8a *R/dummy.R
+d0f249f4b0ca8cd91cfab2278a963f91 *R/omopr_init.R
+baa73bc331f284629fd1b2cd1f171b58 *R/row_counts.R
+38633e84c0d2cfeb5ebb4b7075b35aac *build/vignette.rds
+33d195abcc7d1c2e1b0ac7f993c42801 *inst/doc/omopr.R
+82b57b2bbf80c7e4be3e02a1908e5067 *inst/doc/omopr.Rmd
+4e5a1afdbcf7ca9819dad15e8b37d234 *inst/doc/omopr.html
+1219207e3fe37173a80f6379e968cb60 *man/concept_names.Rd
+e37010dc499361f16f3024607cecfaae *man/omopr_init.Rd
+de9a264b88c3f8554f9efa475a9ea5f9 *man/row_counts.Rd
+82b57b2bbf80c7e4be3e02a1908e5067 *vignettes/omopr.Rmd
